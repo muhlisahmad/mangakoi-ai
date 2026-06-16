@@ -1,0 +1,32 @@
+# ── Core deep learning ───────────────────────────────────────────
+torch==2.3.0
+torchvision==0.18.0
+
+# ── HuggingFace stack ────────────────────────────────────────────
+transformers>=5.0.0
+tokenizers
+accelerate
+bitsandbytes          # 4-bit NF4 quantisation for Qwen3-14B
+diffusers             # kept for future SD-based experiments
+sentencepiece         # Qwen3 tokeniser
+protobuf
+
+# ── Pipeline models ───────────────────────────────────────────────
+manga-ocr             # kha-white/manga-ocr-base wrapper
+simple-lama-inpainting    # LaMa inpainting; add --no-deps to avoids stale Pillow pin
+
+# ── Computer vision ───────────────────────────────────────────────
+opencv-python-headless   # headless: no GUI deps (safe in containers)
+scikit-learn             # KMeans for colour identity extraction
+
+# ── Image processing ──────────────────────────────────────────────
+Pillow
+
+# ── Numerics ─────────────────────────────────────────────────────
+numpy
+
+# ── Storage ───────────────────────────────────────────────────────
+boto3                 # S3-compatible client for Cloudflare R2
+
+# ── RunPod SDK ────────────────────────────────────────────────────
+runpod
