@@ -37,6 +37,7 @@ Notes:
 import json
 import logging
 import os
+import sys
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -139,6 +140,7 @@ def setup_logging(
 
     Args:
         log_dir: Directory for log files. Uses ISO 8601 date-based filenames.
+                 If None, reads from LOG_DIR environment variable.
                  Defaults to "/runpod-volume/logs" (per RunPod best practices).
                  Example files: worker-2026-06-23.log, worker-2026-06-24.log
         log_level: Logging level. Defaults to "INFO" for production.
@@ -152,7 +154,7 @@ def setup_logging(
         The configured logger instance for the "runpod_worker" application.
 
     Example:
-        >>> logger = setup_logging(log_dir="/var/logs", log_level="INFO", log_format="json")
+        >>> logger = setup_logging(log_level="INFO", log_format="json")
         >>> logger.info("Application started")
 
     Note:
@@ -160,10 +162,12 @@ def setup_logging(
         - Sets up both stdout handler (for RunPod console) and file handler (persistent logs)
         - Log files use ISO 8601 date format: worker-YYYY-MM-DD.log
         - Log directory is created automatically if it doesn't exist
+        - LOG_DIR, LOG_LEVEL, and LOG_FORMAT can be set via environment variables
     """
     global _logging_initialized
 
     # Read configuration from environment variables (can override defaults)
+    env_log_dir = os.environ.get("LOG_DIR", log_dir)
     env_log_level = os.environ.get("LOG_LEVEL", log_level).upper()
     env_log_format = os.environ.get("LOG_FORMAT", log_format).lower()
 
@@ -190,17 +194,17 @@ def setup_logging(
 
     _logging_initialized = True
 
-    os.makedirs(log_dir, exist_ok=True)  # Ensure log directory exists
+    os.makedirs(env_log_dir, exist_ok=True)  # Ensure log directory exists
 
     # Configure logger level
     logger.setLevel(getattr(logging, env_log_level))
 
     # Create stdout handler (RunPod captures stdout/stderr automatically)
-    console_handler = logging.StreamHandler()
+    console_handler = logging.StreamHandler(sys.stdout)
 
     # Create file handler with ISO 8601 date-based filename
     log_filename = _get_log_filename()
-    file_handler = logging.FileHandler(os.path.join(log_dir, log_filename))
+    file_handler = logging.FileHandler(os.path.join(env_log_dir, log_filename))
 
     # Select and attach formatter
     if env_log_format == "json":
