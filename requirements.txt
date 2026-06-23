@@ -7,7 +7,6 @@ sentencepiece==0.2.1
 protobuf==5.29.6
 
 # --- Diffusion & Vision ---
-diffusers==0.38.0
 manga-ocr==0.1.14
 opencv-python-headless==4.13.0.92
 
