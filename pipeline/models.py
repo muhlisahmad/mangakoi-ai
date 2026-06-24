@@ -33,22 +33,38 @@ def load_all_models() -> dict[object, object]:
     )
 
     logger.info("Loading detector (RT-DETRv2)...")
-    detector_model, detector_processor = load_detector(
-        device=device, cache_dir=cache_dir if cache_dir else None
-    )
+    try:
+        detector_model, detector_processor = load_detector(
+            device=device, cache_dir=cache_dir if cache_dir else None
+        )
+    except Exception:
+        logger.critical("Failed to load detector model", exc_info=True)
+        raise
 
     logger.info("Loading OCR (manga-ocr-base)...")
-    ocr_model = load_ocr(force_cpu=(device == "cpu"))
+    try:
+        ocr_model = load_ocr(force_cpu=(device == "cpu"))
+    except Exception:
+        logger.critical("Failed to load OCR model", exc_info=True)
+        raise
 
     logger.info("Loading translator (Qwen3-14B)...")
-    translator_model, translator_tokenizer = load_translator(
-        device_map="auto" if device == "cuda" else "cpu",
-        use_4bit=use_4bit,
-        cache_dir=cache_dir if cache_dir else None,
-    )
+    try:
+        translator_model, translator_tokenizer = load_translator(
+            device_map="auto" if device == "cuda" else "cpu",
+            use_4bit=use_4bit,
+            cache_dir=cache_dir if cache_dir else None,
+        )
+    except Exception:
+        logger.critical("Failed to load translator model", exc_info=True)
+        raise
 
     logger.info("Loading inpainter (LaMa)...")
-    lama_model = load_inpainter()
+    try:
+        lama_model = load_inpainter()
+    except Exception:
+        logger.critical("Failed to load inpainter model", exc_info=True)
+        raise
 
     logger.info("All models loaded successfully.")
 

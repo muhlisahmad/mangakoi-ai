@@ -47,24 +47,36 @@ REQUIRED_ENV_VARS = [
 ]
 _missing = [v for v in REQUIRED_ENV_VARS if not os.environ.get(v)]
 if _missing:
+    logger.critical(
+        "Missing required environment variables at startup",
+        extra={"missing_vars": _missing},
+    )
     raise ValueError(f"Missing required environment variables: {', '.join(_missing)}")
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 WEBHOOK_TIMEOUT_SECONDS = int(os.environ.get("WEBHOOK_TIMEOUT_SECONDS", "10"))
 
-s3 = boto3.client(
-    "s3",
-    endpoint_url=os.environ["BUCKET_ENDPOINT_URL"],
-    aws_access_key_id=os.environ["BUCKET_ACCESS_KEY_ID"],
-    aws_secret_access_key=os.environ["BUCKET_SECRET_ACCESS_KEY"],
-)
+try:
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=os.environ["BUCKET_ENDPOINT_URL"],
+        aws_access_key_id=os.environ["BUCKET_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["BUCKET_SECRET_ACCESS_KEY"],
+    )
+except Exception:
+    logger.critical("Failed to create S3 client at startup", exc_info=True)
+    raise
 
 # ── Load all models ONCE, outside the handler ────────────────────────
 # This is the single most important RunPod best practice for this
 # worker: heavy model loading happens here, at import time, so a warm
 # worker processing job #2, #3, #N never reloads anything.
 logger.info("Worker starting — loading models...")
-MODELS = load_all_models()
+try:
+    MODELS = load_all_models()
+except Exception:
+    logger.critical("Failed to load models at startup", exc_info=True)
+    raise
 logger.info("Worker ready.")
 
 
