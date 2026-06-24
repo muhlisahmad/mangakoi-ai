@@ -91,9 +91,7 @@ def handler(job):
             # ── Validate input ───────────────────────────────────────
             validated = validate(job["input"], INPUT_SCHEMA)
             if "errors" in validated:
-                logger.error(
-                    f"Input validation failed: {validated['errors']}", exc_info=True
-                )
+                logger.warning(f"Input validation failed: {validated['errors']}")
                 return {"status": "failed", "error": validated["errors"]}
 
             v = validated["validated_input"]
@@ -107,18 +105,25 @@ def handler(job):
                 == "rtl"
             )
 
-            logger.info(f"Processing job {job_id} — input: {input_key}")
+            logger.info("Processing job", extra={"input_key": input_key, "rtl": rtl})
             start_time = time.time()
 
             # ── Download source image from R2 ────────────────────────
+            logger.debug("Downloading source from R2", extra={"key": input_key})
             response = s3.get_object(Bucket=BUCKET_NAME, Key=input_key)
             image = Image.open(io.BytesIO(response["Body"].read())).convert("RGB")
+            logger.debug(
+                "Source image loaded",
+                extra={"image_size": f"{image.width}x{image.height}"},
+            )
 
             # ── Run the 5-stage pipeline ──────────────────────────────
+            logger.debug("Pipeline execution starting")
             final_image = run_full_pipeline(image, MODELS, rtl=rtl)
 
             # ── Upload result to R2 ───────────────────────────────────
             output_key = f"outputs/{job_id}/translated.png"
+            logger.info("Uploading result to R2", extra={"key": output_key})
             buf = io.BytesIO()
             final_image.save(buf, format="PNG")
             _ = buf.seek(0)
@@ -128,12 +133,15 @@ def handler(job):
 
             elapsed = time.time() - start_time
             logger.info(
-                f"Job {job_id} completed in {elapsed:.1f}s — output: {output_key}"
+                "Job completed",
+                extra={
+                    "elapsed_seconds": round(elapsed, 1),
+                    "output_key": output_key,
+                },
             )
 
             result = {
                 "status": "done",
-                "jobId": job_id,
                 "outputObjectKey": output_key,
                 "elapsedSeconds": round(elapsed, 1),
             }
@@ -143,7 +151,6 @@ def handler(job):
             logger.exception(f"Job failed: {e}")
             error_result = {
                 "status": "failed",
-                "jobId": job_id,
                 "error": str(e),
             }
             return error_result

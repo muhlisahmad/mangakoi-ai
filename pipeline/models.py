@@ -28,7 +28,8 @@ def load_all_models() -> dict[object, object]:
     use_4bit = os.environ.get("USE_4BIT_TRANSLATION", "true").lower() == "true"
 
     logger.info(
-        f"Loading models — device={device}, use_4bit={use_4bit}, cache_dir={cache_dir}"
+        "Loading models",
+        extra={"device": device, "use_4bit": use_4bit, "cache_dir": cache_dir},
     )
 
     logger.info("Loading detector (RT-DETRv2)...")

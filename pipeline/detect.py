@@ -44,6 +44,7 @@ def run_detection(
     device: str,
     threshold: float = DETECTION_THRESHOLD,
 ) -> list[dict[object, object]]:
+    logger.debug("Running detection", extra={"device": device, "threshold": threshold})
     inputs = processor(images=image, return_tensors="pt")
     inputs = {k: v.to(device).to(torch.bfloat16) for k, v in inputs.items()}
 
@@ -70,6 +71,7 @@ def run_detection(
                 "box": [x1, y1, x2, y2],
             }
         )
+    logger.debug("Detection complete", extra={"detections": detections})
     return detections
 
 

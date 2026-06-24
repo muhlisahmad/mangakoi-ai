@@ -14,11 +14,14 @@ logger = get_logger(__name__)
 
 
 def get_device() -> str:
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.debug("Device detection", extra={"device": device})
+    return device
 
 
 def flush_vram():
     """Force-free GPU memory. Call between pipeline stages if VRAM is tight."""
+    logger.debug("Flushing VRAM")
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -32,7 +35,7 @@ def vram_status(label: str = ""):
     reserved = torch.cuda.memory_reserved() / 1e9
     total = torch.cuda.get_device_properties(0).total_memory / 1e9
     tag = f"[{label}] " if label else ""
-    logger.info(
+    logger.debug(
         f"VRAM {tag}— alloc: {alloc:.2f} GB  reserved: {reserved:.2f} GB  total: {total:.2f} GB"
     )
 

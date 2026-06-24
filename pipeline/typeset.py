@@ -171,6 +171,15 @@ def get_adaptive_colors(
     is_chromatic = original_image is not None and is_region_chromatic(
         original_image, box
     )
+    logger.debug(
+        "Color path decision",
+        extra={
+            "is_chromatic": is_chromatic,
+            "label": label,
+            "box": box,
+            "bg_luminance": round(bg_lum, 1),
+        },
+    )
 
     # ── FULL-COLOR PATH ─────────────────────────────────────────
     if is_chromatic:
@@ -180,11 +189,35 @@ def get_adaptive_colors(
                     original_image, cleaned_image, box, cluster_selection="saturation"
                 )
                 if identity is not None:
+                    logger.debug(
+                        "Color result — full-color manga with chromatic bubble background. Set identity color for text_color",
+                        extra={
+                            "text_color": rgb_to_hex(identity),
+                            "stroke_color": None,
+                            "stroke_width": 0,
+                        },
+                    )
                     return rgb_to_hex(identity), None, 0
                 text_color = "#1a1a1a" if bg_lum >= 128 else "#FFFFFF"
+                logger.debug(
+                    "Color result — full-color manga with chromatic text bubble background. Can't get identity color for text_color, fallback to B/W coloring",
+                    extra={
+                        "text_color": text_color,
+                        "stroke_color": None,
+                        "stroke_width": 0,
+                    },
+                )
                 return text_color, None, 0
             else:
                 text_color = "#1a1a1a" if bg_lum >= 128 else "#FFFFFF"
+                logger.debug(
+                    "Color result — full-color manga with colored text bubble background. Set text_color based on contrast",
+                    extra={
+                        "text_color": text_color,
+                        "stroke_color": None,
+                        "stroke_width": 0,
+                    },
+                )
                 return text_color, None, 0
 
         else:  # text_free
@@ -194,18 +227,46 @@ def get_adaptive_colors(
             if identity is not None:
                 id_lum = rgb_luminance(identity)
                 text_color = "#1a1a1a" if id_lum >= 128 else "#FFFFFF"
+                logger.debug(
+                    "Color result — full-color manga, setting text stroke color as identity color.",
+                    extra={
+                        "text_color": text_color,
+                        "stroke_color": rgb_to_hex(identity),
+                        "stroke_width": STROKE_WIDTH_FREE,
+                    },
+                )
                 return text_color, rgb_to_hex(identity), STROKE_WIDTH_FREE
             text_color = "#1a1a1a" if bg_lum >= 128 else "#FFFFFF"
             stroke_color = "#FFFFFF" if text_color == "#1a1a1a" else "#1a1a1a"
+            logger.debug(
+                "Color result — full-color manga. Can't get identity color for text_free, fallback to B/W coloring",
+                extra={
+                    "text_color": text_color,
+                    "stroke_color": stroke_color,
+                    "stroke_width": STROKE_WIDTH_FREE,
+                },
+            )
             return text_color, stroke_color, STROKE_WIDTH_FREE
 
     # ── B&W PATH ─────────────────────────────────────────────────
     if label == "text_bubble":
         text_color = "#1a1a1a" if bg_lum >= 128 else "#FFFFFF"
+        logger.debug(
+            "Color result — B&W text_bubble",
+            extra={"text_color": text_color, "stroke_color": None, "stroke_width": 0},
+        )
         return text_color, None, 0
     else:  # text_free
         text_color = "#1a1a1a" if bg_lum >= 128 else "#FFFFFF"
         stroke_color = "#FFFFFF" if text_color == "#1a1a1a" else "#1a1a1a"
+        logger.debug(
+            "Color result — B&W text_free",
+            extra={
+                "text_color": text_color,
+                "stroke_color": stroke_color,
+                "stroke_width": STROKE_WIDTH_FREE,
+            },
+        )
         return text_color, stroke_color, STROKE_WIDTH_FREE
 
 
@@ -216,6 +277,7 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
         return ImageFont.truetype(FONT_PATH, size)
     except (IOError, OSError):
+        logger.warning("Font fallback to default", extra={"path": FONT_PATH})
         return ImageFont.load_default()
 
 
@@ -226,6 +288,9 @@ def _fit_text(
     break_long_words/break_on_hyphens are disabled so wrapping never
     splits a word mid-character — narrow vertical-derived bubbles would
     otherwise produce broken words like 'presiden' / 't?'."""
+    logger.debug(
+        "Fitting text", extra={"text_len": len(text), "box_size": f"{box_w}x{box_h}"}
+    )
     for size in range(MAX_FONT_SIZE, MIN_FONT_SIZE - 1, -1):
         font = _load_font(size)
         chars_per_line = max(1, int(box_w / (size * 0.6)))
@@ -239,8 +304,15 @@ def _fit_text(
         total_h = line_h * len(lines)
         max_line_w = max(draw.textlength(l, font=font) for l in lines)
         if max_line_w <= box_w * 0.95 and total_h <= box_h * 0.90:
+            logger.debug(
+                "Text fit found", extra={"font_size": size, "lines": len(lines)}
+            )
             return font, lines
 
+    logger.debug(
+        "Text fit exhausted — using min size",
+        extra={"font_size": MIN_FONT_SIZE},
+    )
     font = _load_font(MIN_FONT_SIZE)
     chars = max(1, int(box_w / (MIN_FONT_SIZE * 0.6)))
     lines = textwrap.wrap(
@@ -260,6 +332,7 @@ def _draw_text_in_box(
     x1, y1, x2, y2 = box
     box_w, box_h = x2 - x1, y2 - y1
     if box_w < 20 or box_h < 20:
+        logger.debug("Skipped tiny box", extra={"box": box, "size": f"{box_w}x{box_h}"})
         return
 
     font, lines = _fit_text(draw, text, box_w, box_h)
@@ -271,6 +344,16 @@ def _draw_text_in_box(
     line_h = font_size + 4
     total_h = line_h * len(lines)
     y_start = y1 + (box_h - total_h) // 2
+    logger.debug(
+        "Rendering text",
+        extra={
+            "font_size": font_size,
+            "lines": len(lines),
+            "text_color": text_color,
+            "stroke_color": stroke_color,
+            "stroke_width": stroke_width
+        },
+    )
 
     for i, line in enumerate(lines):
         line_w = draw.textlength(line, font=font)
@@ -290,6 +373,7 @@ def run_typesetting(
     ocr_results: list[dict[str, object]],
     original_image: Image.Image,
 ) -> Image.Image:
+    logger.debug("Starting typesetting", extra={"region_counts": len(ocr_results)})
     output = cleaned_image.copy()
     draw = ImageDraw.Draw(output)
 
@@ -297,6 +381,10 @@ def run_typesetting(
     for region in ocr_results:
         translation = str(region.get("translation", "")).strip()
         if not translation or translation == "[translation error]":
+            logger.debug(
+                "Skipped region — no translation",
+                extra={"label": region.get("label"), "box": region.get("box")},
+            )
             continue
         label = region.get("label")
         if label not in ("text_bubble", "text_free"):
@@ -322,7 +410,8 @@ def run_typesetting(
         else:
             free_count += 1
 
-    logger.info(
-        f"Typeset {bubble_count} speech bubbles + {free_count} free-text regions"
+    logger.debug(
+        "Typesetting complete",
+        extra={"text_bubble_count": bubble_count, "free_text_count": free_count},
     )
     return output

@@ -52,10 +52,19 @@ def run_inpainting(
     lama_model,
 ) -> Image.Image:
     W, H = image.size
+    logger.debug(
+        "Starting inpainting",
+        extra={
+            "image_size": f"{W}x{H}",
+            "text_bubble_boxes": len(text_bubble_detections),
+            "text_free_boxes": len(text_free_detections),
+        },
+    )
     all_boxes = [d["box"] for d in text_bubble_detections] + [
         d["box"] for d in text_free_detections
     ]
     if not all_boxes:
+        logger.debug("No boxes to inpaint — skipping")
         return image
 
     mask = _make_mask((W, H), all_boxes)  # pyright: ignore[reportArgumentType]

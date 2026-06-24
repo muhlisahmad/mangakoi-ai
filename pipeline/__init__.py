@@ -35,6 +35,11 @@ def run_full_pipeline(
     """
     device = models["device"]
 
+    logger.debug(
+        "Pipeline starting",
+        extra={"image_size": f"{image.size[0]}x{image.size[1]}", "rtl": rtl},
+    )
+
     # ── Stage 1: Detection ──────────────────────────────────────
     logger.info("Stage 1/5 — Detection")
     all_detections = run_detection(
@@ -45,28 +50,33 @@ def run_full_pipeline(
     text_bubble_boxes = [d for d in all_detections if d["label"] == "text_bubble"]
     text_free_boxes = [d for d in all_detections if d["label"] == "text_free"]
     text_regions = text_bubble_boxes + text_free_boxes
+    logger.info("Stage 1 complete")
 
     # ── Stage 2: OCR ─────────────────────────────────────────────
-    logger.info(f"Stage 2/5 — OCR ({len(text_regions)} regions)")
+    logger.info("Stage 2/5 — OCR")
     ocr_results = run_ocr(image, text_regions, models["ocr_model"])
     ocr_with_text = [r for r in ocr_results if r["text"]]
+    logger.info("Stage 2 complete")
 
     # ── Stage 3: Translation ────────────────────────────────────
-    logger.info(f"Stage 3/5 — Translation ({len(ocr_with_text)} regions)")
+    logger.info("Stage 3/5 — Translation")
     translated_results = translate_ocr_results(
         ocr_with_text, models["translator_model"], models["translator_tokenizer"]
     )
+    logger.info("Stage 3 complete")
 
     # ── Stage 4: Inpainting ─────────────────────────────────────
     logger.info("Stage 4/5 — Inpainting (LaMa)")
     cleaned_image = run_inpainting(
         image, text_bubble_boxes, text_free_boxes, models["lama_model"]
     )
+    logger.info("Stage 4 complete")
 
     # ── Stage 5: Typesetting ────────────────────────────────────
     logger.info("Stage 5/5 — Typesetting")
     final_image = run_typesetting(
         cleaned_image, translated_results, original_image=image
     )
+    logger.info("Pipeline finished")
 
     return final_image
