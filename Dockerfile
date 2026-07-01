@@ -9,6 +9,11 @@ FROM pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV HF_HOME="/runpod-volume/.cache/huggingface"
+ENV TORCH_HOME="/runpod-volume/.cache/torch"
+ENV USE_4BIT_TRANSLATION="false"
+
+WORKDIR /app
 
 # System dependencies:
 #   python3.11           — runtime
@@ -19,7 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Create a non-root user for security and to avoid permission issues with mounted volumes.
+RUN useradd -u 10001 -m appuser
 
 # Install Python dependencies first so this layer is cached and only
 # rebuilds when requirements.txt actually changes — not on every
@@ -33,13 +39,7 @@ RUN pip install --no-cache-dir --no-deps simple-lama-inpainting
 # Application code
 COPY pipeline/ ./pipeline/
 COPY handler.py .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-# Build-time defaults (non-sensitive). Runtime secrets — BUCKET_*,
-# webhook config — are set in the RunPod console per the
-# environment-variables best practices, never baked into the image.
-ENV USE_4BIT_TRANSLATION="false"
-ENV HF_HOME="/runpod-volume/hf_cache"
-
-# -u: unbuffered stdout/stderr so logs reach the RunPod console in
-# real time instead of being buffered until the process exits.
-CMD ["python3", "-u", "handler.py"]
+ENTRYPOINT ["/app/entrypoint.sh"]
