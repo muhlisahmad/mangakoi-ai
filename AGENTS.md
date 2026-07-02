@@ -216,14 +216,56 @@ ENV HF_HOME="/runpod-volume/hf_cache"
 
 ### Response Payload
 
+RunPod wraps the handler's return value in the `"output"` field and adds top-level metadata. The `status` inside `output` is application-level; the top-level `status` reflects RunPod SDK's job state.
+
+**Success — `/runsync` response:**
+
 ```json
 {
-  "status": "done",
-  "jobId": "abc-123-def",
-  "outputObjectKey": "outputs/abc-123-def/translated.png",
-  "elapsedSeconds": 45.2
+  "delayTime": 824,
+  "executionTime": 3391,
+  "id": "sync-79164ff4-d212-44bc-9fe3-389e199a5c15",
+  "output": {
+    "status": "done",
+    "outputObjectKey": "outputs/sync-79164ff4-d212-44bc-9fe3-389e199a5c15/translated.png",
+    "elapsedSeconds": 45.2
+  },
+  "status": "COMPLETED"
 }
 ```
+
+**Success — `/run` then `/status` response:**
+
+```json
+{
+  "delayTime": 31618,
+  "executionTime": 1437,
+  "id": "60902e6c-08a1-426e-9cb9-9eaec90f5e2b-u1",
+  "output": {
+    "status": "done",
+    "outputObjectKey": "outputs/60902e6c-08a1-426e-9cb9-9eaec90f5e2b-u1/translated.png",
+    "elapsedSeconds": 45.2
+  },
+  "status": "COMPLETED"
+}
+```
+
+**Failure (caught exception — job still `COMPLETED` at RunPod level):**
+
+```json
+{
+  "delayTime": 1200,
+  "executionTime": 5000,
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "output": {
+    "status": "failed",
+    "error": "ConnectionError: R2 endpoint unreachable"
+  },
+  "status": "COMPLETED"
+}
+```
+
+> **Note**: The handler's `try/except` catches all exceptions and returns a dict, so RunPod always reports `"status": "COMPLETED"` at the top level. Check `output.status` for the actual pipeline result. Uncaught exceptions propagate to RunPod SDK and set top-level `"status": "FAILED"`.
 
 **Output Location**: `outputs/{job_id}/translated.png` in R2 bucket
 
